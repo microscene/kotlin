@@ -20,10 +20,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Lists;
 import com.intellij.lang.ASTNode;
-import com.intellij.psi.PsiComment;
-import com.intellij.psi.PsiElement;
-import com.intellij.psi.PsiFile;
-import com.intellij.psi.PsiWhiteSpace;
+import com.intellij.psi.*;
 import com.intellij.psi.impl.CheckUtil;
 import com.intellij.psi.impl.source.codeStyle.CodeEditUtil;
 import com.intellij.psi.tree.IElementType;
@@ -853,5 +850,19 @@ public class JetPsiUtil {
             return e;
         }
         return null;
+    }
+
+    public static NavigatablePsiElement getPackageReference(@NotNull JetFile file, int partIndex) {
+        JetNamespaceHeader header = file.getNamespaceHeader();
+        if (header == null) {
+            throw new IllegalArgumentException("Should be called only for files with namespace: " + file);
+        }
+
+        List<JetSimpleNameExpression> names = header.getParentNamespaceNames();
+        if (!(0 <= partIndex && partIndex < names.size() + 1)) {
+            throw new IndexOutOfBoundsException(String.format("%s index for file with header %s is out of range", partIndex, header.getText()));
+        }
+
+        return (names.size() > partIndex) ? names.get(partIndex) : header.getLastPartExpression();
     }
 }
