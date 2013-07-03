@@ -294,7 +294,7 @@ public final class CallTranslator extends AbstractTranslator {
 
     private boolean isObjectAccessor(@NotNull PropertyAccessorDescriptor propertyAccessorDescriptor) {
         PropertyDescriptor correspondingProperty = propertyAccessorDescriptor.getCorrespondingProperty();
-        return isObjectDeclaration(bindingContext(), correspondingProperty);
+        return isObjectDeclaration(correspondingProperty);
     }
 
     @NotNull
