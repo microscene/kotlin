@@ -19,7 +19,10 @@ package org.jetbrains.jet.lang.resolve.java.resolver;
 import com.google.common.collect.Lists;
 import com.intellij.psi.*;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.jet.lang.descriptors.*;
+import org.jetbrains.jet.lang.descriptors.ClassDescriptor;
+import org.jetbrains.jet.lang.descriptors.PropertyDescriptor;
+import org.jetbrains.jet.lang.descriptors.ValueParameterDescriptor;
+import org.jetbrains.jet.lang.descriptors.VariableDescriptor;
 import org.jetbrains.jet.lang.descriptors.annotations.AnnotationDescriptor;
 import org.jetbrains.jet.lang.resolve.constants.*;
 import org.jetbrains.jet.lang.resolve.constants.StringValue;
@@ -164,32 +167,39 @@ public final class JavaCompileTimeConstResolver {
 
     @Nullable
     private static CompileTimeConstant<?> getCompileTimeConstFromLiteralExpression(PsiLiteralExpression value) {
-        Object literalValue = value.getValue();
-        if (literalValue instanceof String) {
-            return new StringValue((String) literalValue);
+        return resolveCompileTimeConstantValue(value.getValue());
+    }
+
+    @Nullable
+    public static CompileTimeConstant<?> resolveCompileTimeConstantValue(@Nullable Object value) {
+        if (value instanceof String) {
+            return new StringValue((String) value);
         }
-        else if (literalValue instanceof Byte) {
-            return new ByteValue((Byte) literalValue);
+        else if (value instanceof Byte) {
+            return new ByteValue((Byte) value);
         }
-        else if (literalValue instanceof Short) {
-            return new ShortValue((Short) literalValue);
+        else if (value instanceof Short) {
+            return new ShortValue((Short) value);
         }
-        else if (literalValue instanceof Character) {
-            return new CharValue((Character) literalValue);
+        else if (value instanceof Character) {
+            return new CharValue((Character) value);
         }
-        else if (literalValue instanceof Integer) {
-            return new IntValue((Integer) literalValue);
+        else if (value instanceof Integer) {
+            return new IntValue((Integer) value);
         }
-        else if (literalValue instanceof Long) {
-            return new LongValue((Long) literalValue);
+        else if (value instanceof Long) {
+            return new LongValue((Long) value);
         }
-        else if (literalValue instanceof Float) {
-            return new FloatValue((Float) literalValue);
+        else if (value instanceof Float) {
+            return new FloatValue((Float) value);
         }
-        else if (literalValue instanceof Double) {
-            return new DoubleValue((Double) literalValue);
+        else if (value instanceof Double) {
+            return new DoubleValue((Double) value);
         }
-        else if (literalValue == null) {
+        else if (value instanceof Boolean) {
+            return BooleanValue.valueOf((Boolean) value);
+        }
+        else if (value == null) {
             return NullValue.NULL;
         }
         return null;
