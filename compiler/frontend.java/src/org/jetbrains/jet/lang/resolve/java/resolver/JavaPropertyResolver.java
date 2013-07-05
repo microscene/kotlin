@@ -18,6 +18,7 @@ package org.jetbrains.jet.lang.resolve.java.resolver;
 
 import com.google.common.collect.Sets;
 import com.intellij.psi.PsiEnumConstant;
+import com.intellij.psi.PsiParameter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jet.lang.descriptors.*;
@@ -299,7 +300,7 @@ public final class JavaPropertyResolver {
         if (setterDescriptor != null) {
             PropertyPsiDataElement setter = data.getSetter();
             assert setter != null;
-            List<PsiParameterWrapper> parameters = ((PsiMethodWrapper) setter.getMember()).getParameters();
+            List<PsiParameter> parameters = ((PsiMethodWrapper) setter.getMember()).getParameters();
             assert parameters.size() != 0;
             setterDescriptor.initialize(new ValueParameterDescriptorImpl(
                     setterDescriptor,
