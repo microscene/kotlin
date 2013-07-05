@@ -40,8 +40,6 @@ import org.jetbrains.jet.lang.types.TypeUtils;
 import javax.inject.Inject;
 import java.util.*;
 
-import static org.jetbrains.jet.lang.resolve.java.provider.DeclarationOrigin.JAVA;
-
 //TODO: getters and setter are not working
 public final class JavaPropertyResolver {
 
@@ -84,14 +82,13 @@ public final class JavaPropertyResolver {
             return Collections.emptySet();
         }
 
-        return resolveNamedGroupProperties(ownerDescriptor, scopeData, namedMembers, fieldName,
+        return resolveNamedGroupProperties(ownerDescriptor, namedMembers, fieldName,
                                            "class or namespace " + DescriptorUtils.getFQName(ownerDescriptor));
     }
 
     @NotNull
     private Set<VariableDescriptor> resolveNamedGroupProperties(
             @NotNull ClassOrNamespaceDescriptor ownerDescriptor,
-            @NotNull PsiDeclarationProvider scopeData,
             @NotNull NamedMembers namedMembers,
             @NotNull Name propertyName,
             @NotNull String context
@@ -115,7 +112,7 @@ public final class JavaPropertyResolver {
                 continue;
             }
 
-            propertiesFromCurrent.add(resolveProperty(ownerDescriptor, scopeData, propertyName, context, propertyPsiData));
+            propertiesFromCurrent.add(resolveProperty(ownerDescriptor, propertyName, context, propertyPsiData));
         }
 
         Set<PropertyDescriptor> propertiesFromSupertypes = getPropertiesFromSupertypes(propertyName, ownerDescriptor);
@@ -162,12 +159,10 @@ public final class JavaPropertyResolver {
     @NotNull
     private PropertyDescriptor resolveProperty(
             @NotNull ClassOrNamespaceDescriptor owner,
-            @NotNull PsiDeclarationProvider scopeData,
             @NotNull Name propertyName,
             @NotNull String context,
             @NotNull PropertyPsiData psiData
     ) {
-        boolean isFinal = isPropertyFinal(scopeData, psiData);
         boolean isVar = psiData.isVar();
 
         PropertyPsiDataElement characteristicMember = psiData.getCharacteristicMember();
@@ -181,7 +176,7 @@ public final class JavaPropertyResolver {
         }
 
         PropertyDescriptorImpl propertyDescriptor =
-                createPropertyDescriptor(owner, propertyName, psiData, isFinal, isVar, visibility, kind);
+                createPropertyDescriptor(owner, propertyName, psiData, true, isVar, visibility, kind);
 
         PropertyGetterDescriptorImpl getterDescriptor = resolveGetter(visibility, kind, getter, propertyDescriptor);
         PropertySetterDescriptorImpl setterDescriptor = resolveSetter(psiData, kind, propertyDescriptor);
@@ -205,12 +200,8 @@ public final class JavaPropertyResolver {
                 receiverType
         );
         initializeSetterAndGetter(propertyDescriptor, getterDescriptor, setterDescriptor, propertyType, psiData);
-
         trace.record(BindingContext.VARIABLE, psiData.getCharacteristicPsi(), propertyDescriptor);
-
-        if (scopeData.getDeclarationOrigin() == JAVA) {
-            trace.record(JavaBindingContext.IS_DECLARED_IN_JAVA, propertyDescriptor);
-        }
+        trace.record(JavaBindingContext.IS_DECLARED_IN_JAVA, propertyDescriptor);
         return propertyDescriptor;
     }
 
@@ -428,13 +419,6 @@ public final class JavaPropertyResolver {
             }
         }
         return regularPropertiesCount;
-    }
-
-    private static boolean isPropertyFinal(PsiDeclarationProvider scopeData, PropertyPsiData psiData) {
-        if (scopeData.getDeclarationOrigin() == JAVA) {
-            return true;
-        }
-        return psiData.isFinal();
     }
 
     @NotNull
