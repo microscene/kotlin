@@ -19,20 +19,24 @@ package org.jetbrains.jet.plugin.caches;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Sets;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.*;
 import com.intellij.psi.impl.java.stubs.index.JavaAnnotationIndex;
 import com.intellij.psi.impl.java.stubs.index.JavaMethodNameIndex;
 import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiTreeUtil;
-import jet.runtime.typeinfo.JetClass;
+import jet.KotlinInfo;
 import jet.runtime.typeinfo.JetPackageClass;
 import jet.runtime.typeinfo.JetValueParameter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.jet.lang.resolve.java.JvmStdlibNames;
+import org.jetbrains.jet.descriptors.serialization.ClassData;
+import org.jetbrains.jet.descriptors.serialization.DescriptorDeserializer;
+import org.jetbrains.jet.descriptors.serialization.Flags;
+import org.jetbrains.jet.lang.descriptors.ClassKind;
 import org.jetbrains.jet.lang.resolve.java.PackageClassUtils;
-import org.jetbrains.jet.lang.resolve.java.kt.JetClassAnnotation;
 import org.jetbrains.jet.lang.resolve.java.kt.JetValueParameterAnnotation;
+import org.jetbrains.jet.lang.resolve.java.resolver.DeserializedDescriptorResolver;
 import org.jetbrains.jet.lang.resolve.name.FqName;
 import org.jetbrains.jet.lang.resolve.name.Name;
 import org.jetbrains.jet.util.QualifiedNamesUtil;
@@ -45,7 +49,7 @@ import java.util.Set;
 /**
  * Number of helper methods for searching jet element prototypes in java. Methods use java indices for search.
  */
-class JetFromJavaDescriptorHelper {
+public class JetFromJavaDescriptorHelper {
 
     private JetFromJavaDescriptorHelper() {
     }
@@ -81,15 +85,37 @@ class JetFromJavaDescriptorHelper {
     static Collection<PsiClass> getCompiledClassesForTopLevelObjects(Project project, GlobalSearchScope scope) {
         Set<PsiClass> jetObjectClasses = Sets.newHashSet();
 
-        Collection<PsiClass> classesByAnnotation = getClassesByAnnotation(JetClass.class.getSimpleName(), project, scope);
+        Collection<PsiClass> classesByAnnotation = getClassesByAnnotation(KotlinInfo.class.getSimpleName(), project, scope);
+
         for (PsiClass psiClass : classesByAnnotation) {
-            JetClassAnnotation jetAnnotation = JetClassAnnotation.get(psiClass);
-            if (psiClass.getContainingClass() == null && jetAnnotation.kind() == JvmStdlibNames.FLAG_CLASS_KIND_OBJECT) {
+            assert false;
+            ClassKind kind = getCompiledClassKind(psiClass);
+            if (kind == null) {
+                continue;
+            }
+            if (psiClass.getContainingClass() == null && kind == ClassKind.OBJECT) {
                 jetObjectClasses.add(psiClass);
             }
         }
 
         return jetObjectClasses;
+    }
+
+    @Nullable
+    public static ClassKind getCompiledClassKind(@NotNull PsiClass psiClass) {
+        PsiFile psiFile = psiClass.getContainingFile();
+        if (psiFile == null) {
+            return null;
+        }
+        VirtualFile virtualFile = psiFile.getVirtualFile();
+        if (virtualFile == null) {
+            return null;
+        }
+        ClassData classData = DeserializedDescriptorResolver.readClassDataNoErrorReporting(virtualFile);
+        if (classData == null) {
+            return null;
+        }
+        return DescriptorDeserializer.classKind(Flags.CLASS_KIND.get(classData.getClassProto().getFlags()));
     }
 
     static Collection<String> getTopExtensionFunctionNames(Project project, GlobalSearchScope scope) {
