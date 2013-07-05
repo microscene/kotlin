@@ -55,8 +55,7 @@ public class JetFromJavaDescriptorHelper {
         /* Will iterate through short name caches
            Kotlin namespaces from jar a class files will be collected from java cache
            Kotlin namespaces classes from sources will be collected with JetShortNamesCache.getClassesByName */
-
-        return getClassesByAnnotation(JetPackageClass.class.getSimpleName(), project, scope);
+        return getClassesByAnnotation(KotlinPackage.class.getSimpleName(), project, scope);
     }
 
     /**
