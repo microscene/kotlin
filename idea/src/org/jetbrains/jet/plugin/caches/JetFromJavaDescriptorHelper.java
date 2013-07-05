@@ -26,13 +26,11 @@ import jet.KotlinClass;
 import jet.KotlinPackage;
 import com.intellij.psi.util.PsiTreeUtil;
 import jet.runtime.typeinfo.JetPackageClass;
-import jet.runtime.typeinfo.JetValueParameter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jet.descriptors.serialization.*;
 import org.jetbrains.jet.lang.descriptors.ClassKind;
 import org.jetbrains.jet.lang.resolve.java.PackageClassUtils;
-import org.jetbrains.jet.lang.resolve.java.kt.JetValueParameterAnnotation;
 import org.jetbrains.jet.lang.resolve.java.resolver.DeserializedDescriptorResolver;
 import org.jetbrains.jet.lang.resolve.name.FqName;
 import org.jetbrains.jet.lang.resolve.name.Name;
@@ -40,7 +38,6 @@ import org.jetbrains.jet.util.QualifiedNamesUtil;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -137,34 +134,6 @@ public class JetFromJavaDescriptorHelper {
         return virtualFile;
     }
 
-    static Collection<String> getTopExtensionFunctionNames(Project project, GlobalSearchScope scope) {
-
-        // Extension function should have an parameter of type JetValueParameter with explicit receiver parameter.
-
-        Set<String> extensionNames = new HashSet<String>();
-
-        Collection<PsiAnnotation> valueParametersAnnotations = JavaAnnotationIndex.getInstance().get(
-                JetValueParameter.class.getSimpleName(), project, scope);
-
-        for (PsiAnnotation parameterAnnotation : valueParametersAnnotations) {
-            PsiParameter parameter = PsiTreeUtil.getParentOfType(parameterAnnotation, PsiParameter.class);
-            if (parameter == null) {
-                continue;
-            }
-
-            if (!JetValueParameterAnnotation.get(parameter).receiver()) {
-                continue;
-            }
-
-            PsiMethod psiMethod = PsiTreeUtil.getParentOfType(parameter, PsiMethod.class);
-            if (psiMethod != null) {
-                extensionNames.add(psiMethod.getName());
-            }
-        }
-
-        return extensionNames;
-    }
-
     @Nullable
     static FqName getJetTopLevelDeclarationFQN(@NotNull PsiMethod method) {
         PsiClass containingClass = method.getContainingClass();
@@ -199,18 +168,21 @@ public class JetFromJavaDescriptorHelper {
         return classes;
     }
 
+
     @NotNull
     public static Collection<FqName> getTopLevelFunctionFqNames(
-            String desiredName,
-            Project project,
-            GlobalSearchScope scope,
+            @NotNull Project project,
+            @NotNull GlobalSearchScope scope,
             boolean shouldBeExtension
     ) {
         Collection<FqName> result = Sets.newHashSet();
         Collection<PsiClass> packageClasses = getClassesByAnnotation(KotlinPackage.class.getSimpleName(), project, scope);
         for (PsiClass psiClass : packageClasses) {
-            //TODO:
-            FqName packageFqName = new FqName(psiClass.getQualifiedName()).parent();
+            String qualifiedName = psiClass.getQualifiedName();
+            if (qualifiedName == null) {
+                continue;
+            }
+            FqName packageFqName = new FqName(qualifiedName).parent();
             PackageData data = getPackageData(psiClass);
             if (data == null) {
                 continue;
@@ -219,9 +191,7 @@ public class JetFromJavaDescriptorHelper {
             for (ProtoBuf.Callable callable : data.getPackageProto().getMemberList()) {
                 if (callable.hasReceiverType() == shouldBeExtension) {
                     Name name = nameResolver.getName(callable.getName());
-                    if (name.asString().equals(desiredName)) {
-                        result.add(packageFqName.child(name));
-                    }
+                    result.add(packageFqName.child(name));
                 }
             }
         }

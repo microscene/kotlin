@@ -27,6 +27,7 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.search.PsiShortNamesCache;
 import com.intellij.util.ArrayUtil;
 import com.intellij.util.Processor;
+import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.HashSet;
 import com.intellij.util.containers.MultiMap;
 import org.jetbrains.annotations.NonNls;
@@ -213,7 +214,7 @@ public class JetShortNamesCache extends PsiShortNamesCache {
 
     @NotNull
     public Collection<FunctionDescriptor> getTopLevelFunctionDescriptorsByName(
-            @NotNull String name,
+            @NotNull final String name,
             @NotNull JetSimpleNameExpression expression,
             @NotNull ResolveSession resolveSession,
             @NotNull GlobalSearchScope scope
@@ -233,7 +234,13 @@ public class JetShortNamesCache extends PsiShortNamesCache {
 
         Set<FunctionDescriptor> result = Sets.newHashSet();
 
-        Collection<FqName> topLevelFunctionFqNames = getTopLevelFunctionFqNames(referenceName.asString(), project, scope, false);
+        Collection<FqName> topLevelFunctionFqNames =
+                ContainerUtil.filter(getTopLevelFunctionFqNames(project, scope, false), new Condition<FqName>() {
+                    @Override
+                    public boolean value(FqName fqName) {
+                        return fqName.lastSegmentIs(Name.identifier(name));
+                    }
+                });
         for (FqName fqName : topLevelFunctionFqNames) {
             JetImportDirective importDirective = JetPsiFactory.createImportDirective(project, new ImportPath(fqName, false));
             Collection<? extends DeclarationDescriptor> declarationDescriptors = new QualifiedExpressionResolver().analyseImportReference(
@@ -269,22 +276,6 @@ public class JetShortNamesCache extends PsiShortNamesCache {
         return result;
     }
 
-    /**
-     * Get jet extensions top-level function names. Method is allowed to give invalid names - all result should be
-     * checked with getAllJetExtensionFunctionsByName().
-     *
-     * @return
-     */
-    @NotNull
-    public Collection<String> getAllJetExtensionFunctionsNames(@NotNull GlobalSearchScope scope) {
-        Set<String> extensionFunctionNames = new HashSet<String>();
-
-        extensionFunctionNames.addAll(JetExtensionFunctionNameIndex.getInstance().getAllKeys(project));
-        extensionFunctionNames.addAll(JetFromJavaDescriptorHelper.getTopExtensionFunctionNames(project, scope));
-
-        return extensionFunctionNames;
-    }
-
     private Collection<PsiElement> getJetExtensionFunctionsByName(@NotNull String name, @NotNull GlobalSearchScope scope) {
         HashSet<PsiElement> functions = new HashSet<PsiElement>();
         functions.addAll(JetExtensionFunctionNameIndex.getInstance().get(name, project, scope));
@@ -293,59 +284,77 @@ public class JetShortNamesCache extends PsiShortNamesCache {
     }
 
     // TODO: Make it work for properties
+    @NotNull
     public Collection<DeclarationDescriptor> getJetCallableExtensions(
-            @NotNull Condition<String> acceptedNameCondition,
+            @NotNull final Condition<String> acceptedNameCondition,
             @NotNull JetSimpleNameExpression expression,
             @NotNull ResolveSession resolveSession,
             @NotNull GlobalSearchScope searchScope
     ) {
-        Collection<DeclarationDescriptor> resultDescriptors = new ArrayList<DeclarationDescriptor>();
 
         BindingContext context = ResolveSessionUtils.resolveToExpression(resolveSession, expression);
         JetExpression receiverExpression = expression.getReceiverExpression();
 
-        if (receiverExpression != null) {
-            JetType expressionType = context.get(BindingContext.EXPRESSION_TYPE, receiverExpression);
-            JetScope scope = context.get(BindingContext.RESOLUTION_SCOPE, receiverExpression);
+        if (receiverExpression == null) {
+            return Collections.emptyList();
+        }
+        JetType expressionType = context.get(BindingContext.EXPRESSION_TYPE, receiverExpression);
+        JetScope scope = context.get(BindingContext.RESOLUTION_SCOPE, receiverExpression);
 
-            if (expressionType != null && scope != null) {
-                Collection<String> extensionFunctionsNames = getAllJetExtensionFunctionsNames(searchScope);
+        if (expressionType == null || scope == null) {
+            return Collections.emptyList();
+        }
 
-                Set<FqName> functionFQNs = new java.util.HashSet<FqName>();
+        Set<FqName> functionFQNs = extensionFunctionsFromSourceFqNames(acceptedNameCondition, searchScope);
+        functionFQNs.addAll(ContainerUtil.filter(getTopLevelFunctionFqNames(project, searchScope, true), new Condition<FqName>() {
+            @Override
+            public boolean value(FqName fqName) {
+                return acceptedNameCondition.value(fqName.shortName().asString());
+            }
+        }));
 
-                // Collect all possible extension function qualified names
-                for (String name : extensionFunctionsNames) {
-                    if (acceptedNameCondition.value(name)) {
-                        Collection<PsiElement> extensionFunctions = getJetExtensionFunctionsByName(name, searchScope);
+        Collection<DeclarationDescriptor> resultDescriptors = new ArrayList<DeclarationDescriptor>();
+        // Iterate through the function with attempt to resolve found functions
+        for (FqName functionFQN : functionFQNs) {
+            for (CallableDescriptor functionDescriptor : ExpressionTypingUtils.canFindSuitableCall(
+                    functionFQN, project, receiverExpression, expressionType, scope, resolveSession.getRootModuleDescriptor())) {
 
-                        for (PsiElement extensionFunction : extensionFunctions) {
-                            if (extensionFunction instanceof JetNamedFunction) {
-                                functionFQNs.add(JetPsiUtil.getFQName((JetNamedFunction) extensionFunction));
-                            }
-                            else if (extensionFunction instanceof PsiMethod) {
-                                FqName functionFQN =
-                                        JetFromJavaDescriptorHelper.getJetTopLevelDeclarationFQN((PsiMethod) extensionFunction);
-                                if (functionFQN != null) {
-                                    functionFQNs.add(functionFQN);
-                                }
-                            }
-                        }
-                        functionFQNs.addAll(getTopLevelFunctionFqNames(name, project, searchScope, true));
-                    }
-                }
-
-                // Iterate through the function with attempt to resolve found functions
-                for (FqName functionFQN : functionFQNs) {
-                    for (CallableDescriptor functionDescriptor : ExpressionTypingUtils.canFindSuitableCall(
-                            functionFQN, project, receiverExpression, expressionType, scope, resolveSession.getRootModuleDescriptor())) {
-
-                        resultDescriptors.add(functionDescriptor);
-                    }
-                }
+                resultDescriptors.add(functionDescriptor);
             }
         }
 
         return resultDescriptors;
+    }
+
+    @NotNull
+    private Set<FqName> extensionFunctionsFromSourceFqNames(
+            @NotNull Condition<String> acceptedNameCondition,
+            @NotNull GlobalSearchScope searchScope
+    ) {
+        Set<String> extensionFunctionNames = new HashSet<String>(JetExtensionFunctionNameIndex.getInstance().getAllKeys(project));
+
+        Set<FqName> functionFQNs = new java.util.HashSet<FqName>();
+
+        // Collect all possible extension function qualified names
+        for (String name : extensionFunctionNames) {
+            if (acceptedNameCondition.value(name)) {
+                Collection<PsiElement> extensionFunctions = getJetExtensionFunctionsByName(name, searchScope);
+
+                for (PsiElement extensionFunction : extensionFunctions) {
+                    if (extensionFunction instanceof JetNamedFunction) {
+                        functionFQNs.add(JetPsiUtil.getFQName((JetNamedFunction) extensionFunction));
+                    }
+                    else if (extensionFunction instanceof PsiMethod) {
+                        FqName functionFQN =
+                                JetFromJavaDescriptorHelper.getJetTopLevelDeclarationFQN((PsiMethod) extensionFunction);
+                        if (functionFQN != null) {
+                            functionFQNs.add(functionFQN);
+                        }
+                    }
+                }
+            }
+        }
+        return functionFQNs;
     }
 
     public Collection<ClassDescriptor> getJetClassesDescriptors(
