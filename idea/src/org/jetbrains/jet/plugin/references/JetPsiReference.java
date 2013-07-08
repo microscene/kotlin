@@ -30,6 +30,8 @@ import org.jetbrains.jet.lang.psi.JetReferenceExpression;
 import org.jetbrains.jet.lang.resolve.BindingContext;
 import org.jetbrains.jet.lang.resolve.BindingContextUtils;
 import org.jetbrains.jet.plugin.project.WholeProjectAnalyzerFacade;
+import org.jetbrains.jet.plugin.util.ProfilerUtil;
+import org.jetbrains.jet.utils.Profiler;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -102,19 +104,29 @@ public abstract class JetPsiReference implements PsiPolyVariantReference {
 
     @Nullable
     protected PsiElement doResolve() {
-        BindingContext context = WholeProjectAnalyzerFacade.getContextForExpression(myExpression);
+        BindingContext bindingContext;
 
-        List<PsiElement> psiElements = BindingContextUtils.resolveToDeclarationPsiElements(context, myExpression);
-        if (psiElements.size() == 1) {
-            return psiElements.iterator().next();
+        Profiler subTask = ProfilerUtil.create("Resolve task:" + myExpression.getText());
+        try {
+            subTask.start();
+            bindingContext = WholeProjectAnalyzerFacade.getContextForExpression(myExpression);
+
+            List<PsiElement> psiElements = BindingContextUtils.resolveToDeclarationPsiElements(bindingContext, myExpression);
+            if (psiElements.size() == 1) {
+                return psiElements.iterator().next();
+            }
+            if (psiElements.size() > 1) {
+                return null;
+            }
+            Collection<PsiElement> stdlibSymbols = resolveStandardLibrarySymbol(bindingContext);
+            if (stdlibSymbols.size() == 1) {
+                return stdlibSymbols.iterator().next();
+            }
         }
-        if (psiElements.size() > 1) {
-            return null;
+        finally {
+            subTask.end();
         }
-        Collection<PsiElement> stdlibSymbols = resolveStandardLibrarySymbol(context);
-        if (stdlibSymbols.size() == 1) {
-            return stdlibSymbols.iterator().next();
-        }
+
         return null;
     }
 

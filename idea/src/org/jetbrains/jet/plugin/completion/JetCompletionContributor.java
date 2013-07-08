@@ -25,6 +25,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jet.lang.psi.JetFile;
 import org.jetbrains.jet.plugin.references.JetSimpleNameReference;
+import org.jetbrains.jet.plugin.util.ProfilerUtil;
+import org.jetbrains.jet.utils.Profiler;
 
 public class JetCompletionContributor extends CompletionContributor {
     public JetCompletionContributor() {
@@ -50,19 +52,26 @@ public class JetCompletionContributor extends CompletionContributor {
 
         JetSimpleNameReference jetReference = getJetReference(parameters);
         if (jetReference != null) {
-            result.restartCompletionWhenNothingMatches();
+            Profiler profiler = ProfilerUtil.create("Completion for: " + jetReference);
+            try {
+                profiler.start();
+                result.restartCompletionWhenNothingMatches();
 
-            CompletionSession session = new CompletionSession(parameters, result, jetReference, position);
-            session.completeForReference();
-
-            if (!session.getJetResult().isSomethingAdded() && session.getParameters().getInvocationCount() < 2) {
-                // Rerun completion if nothing was found
-                session = new CompletionSession(parameters.withInvocationCount(2), result, jetReference, position);
+                CompletionSession session = new CompletionSession(parameters, result, jetReference, position);
                 session.completeForReference();
-            }
 
-            // Prevent from adding reference variants from standard reference contributor
-            result.stopHere();
+                if (!session.getJetResult().isSomethingAdded() && session.getParameters().getInvocationCount() < 2) {
+                    // Rerun completion if nothing was found
+                    session = new CompletionSession(parameters.withInvocationCount(2), result, jetReference, position);
+                    session.completeForReference();
+                }
+
+                // Prevent from adding reference variants from standard reference contributor
+                result.stopHere();
+            }
+            finally {
+                profiler.end();
+            }
         }
     }
 

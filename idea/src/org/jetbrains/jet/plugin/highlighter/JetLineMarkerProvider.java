@@ -64,7 +64,9 @@ import org.jetbrains.jet.plugin.JetBundle;
 import org.jetbrains.jet.plugin.codeInsight.JetFunctionPsiElementCellRenderer;
 import org.jetbrains.jet.plugin.project.WholeProjectAnalyzerFacade;
 import org.jetbrains.jet.plugin.search.KotlinDefinitionsSearcher;
+import org.jetbrains.jet.plugin.util.ProfilerUtil;
 import org.jetbrains.jet.renderer.DescriptorRenderer;
+import org.jetbrains.jet.utils.Profiler;
 
 import javax.swing.*;
 import java.awt.event.MouseEvent;
@@ -381,25 +383,33 @@ public class JetLineMarkerProvider implements LineMarkerProvider {
             return;
         }
 
-        Set<JetNamedFunction> functions = Sets.newHashSet();
-        Set<JetProperty> properties = Sets.newHashSet();
+        Profiler profiler = ProfilerUtil.create("Slow linemarkers");
+        try {
+            profiler.start();
 
-        for (PsiElement element : elements) {
-            if (element instanceof JetClass) {
-                collectInheritingClasses((JetClass) element, result);
+            Set<JetNamedFunction> functions = Sets.newHashSet();
+            Set<JetProperty> properties = Sets.newHashSet();
+
+            for (PsiElement element : elements) {
+                if (element instanceof JetClass) {
+                    collectInheritingClasses((JetClass) element, result);
+                }
+
+                if (element instanceof JetNamedFunction) {
+                    functions.add((JetNamedFunction) element);
+                }
+
+                if (element instanceof JetProperty) {
+                    properties.add((JetProperty) element);
+                }
             }
 
-            if (element instanceof JetNamedFunction) {
-                functions.add((JetNamedFunction) element);
-            }
-
-            if (element instanceof JetProperty) {
-                properties.add((JetProperty) element);
-            }
+            collectOverridingAccessors(functions, result);
+            collectOverridingPropertiesAccessors(properties, result);
         }
-
-        collectOverridingAccessors(functions, result);
-        collectOverridingPropertiesAccessors(properties, result);
+        finally {
+            profiler.end();
+        }
     }
 
     private static void collectInheritingClasses(JetClass element, Collection<LineMarkerInfo> result) {

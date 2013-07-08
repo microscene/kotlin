@@ -30,6 +30,8 @@ import org.jetbrains.jet.lang.psi.JetNamedDeclaration;
 import org.jetbrains.jet.lang.psi.JetPsiUtil;
 import org.jetbrains.jet.lang.resolve.name.FqName;
 import org.jetbrains.jet.plugin.stubindex.JetShortClassNameIndex;
+import org.jetbrains.jet.plugin.util.ProfilerUtil;
+import org.jetbrains.jet.utils.Profiler;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -58,41 +60,49 @@ public class JetGotoClassContributor implements GotoClassContributor {
     @NotNull
     @Override
     public String[] getNames(Project project, boolean includeNonProjectItems) {
-        return ArrayUtil.toObjectArray(JetShortClassNameIndex.getInstance().getAllKeys(project), String.class);
+        Collection<String> keys = JetShortClassNameIndex.getInstance().getAllKeys(project);
+        return ArrayUtil.toObjectArray(keys, String.class);
     }
 
     @NotNull
     @Override
     public NavigationItem[] getItemsByName(String name, String pattern, Project project, boolean includeNonProjectItems) {
-        GlobalSearchScope scope = includeNonProjectItems ? GlobalSearchScope.allScope(project) : GlobalSearchScope.projectScope(project);
-        Collection<JetClassOrObject> classesOrObjects = JetShortClassNameIndex.getInstance().get(name, project, scope);
+        Profiler profiler = ProfilerUtil.create("For class: " + name);
+        try {
+            profiler.start();
+            GlobalSearchScope scope = includeNonProjectItems ? GlobalSearchScope.allScope(project) : GlobalSearchScope.projectScope(project);
+            Collection<JetClassOrObject> classesOrObjects = JetShortClassNameIndex.getInstance().get(name, project, scope);
 
-        if (classesOrObjects.isEmpty()) {
-            return NavigationItem.EMPTY_NAVIGATION_ITEM_ARRAY;
-        }
-
-        PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(name, scope);
-        Collection<String> javaQualifiedNames = new HashSet<String>();
-        for (PsiClass aClass : classes) {
-            String qualifiedName = aClass.getQualifiedName();
-            if (qualifiedName != null) {
-                javaQualifiedNames.add(qualifiedName);
-            }
-        }
-
-        List<NavigationItem> items = new ArrayList<NavigationItem>();
-        for (JetClassOrObject classOrObject : classesOrObjects) {
-            FqName fqName = JetPsiUtil.getFQName(classOrObject);
-            if (fqName == null || javaQualifiedNames.contains(fqName.toString())) {
-                // Elements will be added by Java class contributor
-                continue;
+            if (classesOrObjects.isEmpty()) {
+                return NavigationItem.EMPTY_NAVIGATION_ITEM_ARRAY;
             }
 
-            if (classOrObject instanceof JetClass) {
-                items.add(classOrObject);
+            PsiClass[] classes = PsiShortNamesCache.getInstance(project).getClassesByName(name, scope);
+            Collection<String> javaQualifiedNames = new HashSet<String>();
+            for (PsiClass aClass : classes) {
+                String qualifiedName = aClass.getQualifiedName();
+                if (qualifiedName != null) {
+                    javaQualifiedNames.add(qualifiedName);
+                }
             }
-        }
 
-        return ArrayUtil.toObjectArray(items, NavigationItem.class);
+            List<NavigationItem> items = new ArrayList<NavigationItem>();
+            for (JetClassOrObject classOrObject : classesOrObjects) {
+                FqName fqName = JetPsiUtil.getFQName(classOrObject);
+                if (fqName == null || javaQualifiedNames.contains(fqName.toString())) {
+                    // Elements will be added by Java class contributor
+                    continue;
+                }
+
+                if (classOrObject instanceof JetClass) {
+                    items.add(classOrObject);
+                }
+            }
+
+            return ArrayUtil.toObjectArray(items, NavigationItem.class);
+        }
+        finally {
+            profiler.end();
+        }
     }
 }

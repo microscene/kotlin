@@ -45,6 +45,8 @@ import org.jetbrains.jet.lang.resolve.BindingContext;
 import org.jetbrains.jet.plugin.project.WholeProjectAnalyzerFacade;
 import org.jetbrains.jet.plugin.quickfix.JetIntentionActionsFactory;
 import org.jetbrains.jet.plugin.quickfix.QuickFixes;
+import org.jetbrains.jet.plugin.util.ProfilerUtil;
+import org.jetbrains.jet.utils.Profiler;
 
 import java.util.Collection;
 import java.util.List;
@@ -107,7 +109,9 @@ public class JetPsiChecker implements Annotator {
         if (element instanceof JetFile) {
             JetFile file = (JetFile)element;
 
+            Profiler annotate = ProfilerUtil.create("Annotate");
             try {
+                annotate.start();
                 BindingContext bindingContext = WholeProjectAnalyzerFacade.analyzeProjectWithCacheOnAFile(file).getBindingContext();
 
                 boolean isInContent = ProjectFileIndex.SERVICE.getInstance(element.getProject()).isInContent(file.getVirtualFile());
@@ -133,6 +137,9 @@ public class JetPsiChecker implements Annotator {
                 // For failing tests and to notify about idea internal error in -ea mode
                 holder.createErrorAnnotation(element, e.getClass().getCanonicalName() + ": " + e.getMessage());
                 LOG.error(e);
+            }
+            finally {
+                annotate.end();
             }
         }
     }
