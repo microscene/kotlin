@@ -264,7 +264,7 @@ public class DescriptorResolver {
             @NotNull BindingTrace trace
     ) {
        return resolveFunctionDescriptor(containingDescriptor, scope, function, trace,
-                                        annotationResolver.resolveAnnotations(scope, function.getModifierList(), trace));
+                                        annotationResolver.resolveAnnotationsWithoutArguments(scope, function.getModifierList(), trace));
     }
 
     @NotNull
@@ -500,7 +500,7 @@ public class DescriptorResolver {
             JetParameter valueParameter, int index, JetType type, BindingTrace trace
     ) {
         return resolveValueParameterDescriptor(declarationDescriptor, valueParameter, index, type, trace,
-                                               annotationResolver.resolveAnnotations(scope, valueParameter.getModifierList(), trace));
+                annotationResolver.resolveAnnotationsWithoutArguments(scope, valueParameter.getModifierList(), trace));
     }
 
     @NotNull
@@ -509,8 +509,7 @@ public class DescriptorResolver {
             JetParameter valueParameter, int index, JetType type, BindingTrace trace
     ) {
         return resolveValueParameterDescriptor(declarationDescriptor, valueParameter, index, type, trace,
-                                               annotationResolver.resolveAnnotationsWithArguments(scope, valueParameter.getModifierList(),
-                                                                                                  trace));
+                annotationResolver.resolveAnnotationsWithArguments(scope, valueParameter.getModifierList(), trace));
     }
 
     @NotNull
@@ -947,7 +946,7 @@ public class DescriptorResolver {
         Visibility visibility = resolveVisibilityFromModifiers(property, getDefaultVisibility(property, containingDeclaration));
         PropertyDescriptorImpl propertyDescriptor = new PropertyDescriptorImpl(
                 containingDeclaration,
-                annotationResolver.resolveAnnotations(scope, modifierList, trace),
+                annotationResolver.resolveAnnotationsWithoutArguments(scope, modifierList, trace),
                 modality,
                 visibility,
                 isVar,
@@ -1139,7 +1138,8 @@ public class DescriptorResolver {
         JetPropertyAccessor setter = property.getSetter();
         PropertySetterDescriptorImpl setterDescriptor = null;
         if (setter != null) {
-            List<AnnotationDescriptor> annotations = annotationResolver.resolveAnnotations(scope, setter.getModifierList(), trace);
+            List<AnnotationDescriptor> annotations =
+                    annotationResolver.resolveAnnotationsWithoutArguments(scope, setter.getModifierList(), trace);
             JetParameter parameter = setter.getParameter();
 
             setterDescriptor = new PropertySetterDescriptorImpl(
@@ -1232,7 +1232,8 @@ public class DescriptorResolver {
         PropertyGetterDescriptorImpl getterDescriptor;
         JetPropertyAccessor getter = property.getGetter();
         if (getter != null) {
-            List<AnnotationDescriptor> annotations = annotationResolver.resolveAnnotations(scope, getter.getModifierList(), trace);
+            List<AnnotationDescriptor> annotations =
+                    annotationResolver.resolveAnnotationsWithoutArguments(scope, getter.getModifierList(), trace);
 
             JetType outType = propertyDescriptor.getType();
             JetType returnType = outType;
@@ -1294,7 +1295,7 @@ public class DescriptorResolver {
     ) {
         ConstructorDescriptorImpl constructorDescriptor = new ConstructorDescriptorImpl(
                 classDescriptor,
-                annotationResolver.resolveAnnotations(scope, modifierList, trace),
+                annotationResolver.resolveAnnotationsWithoutArguments(scope, modifierList, trace),
                 isPrimary
         );
         trace.record(BindingContext.CONSTRUCTOR, declarationToTrace, constructorDescriptor);
