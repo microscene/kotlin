@@ -48,6 +48,7 @@ import org.jetbrains.jet.plugin.navigation.JetAbstractGotoSuperTest;
 import org.jetbrains.jet.plugin.quickfix.AbstractQuickFixMultiFileTest;
 import org.jetbrains.jet.plugin.quickfix.AbstractQuickFixTest;
 import org.jetbrains.jet.psi.AbstractJetPsiMatcherTest;
+import org.jetbrains.jet.resolve.AbstractResolveBaseTest;
 import org.jetbrains.jet.resolve.AbstractResolveTest;
 import org.jetbrains.jet.safeDelete.AbstractJetSafeDeleteTest;
 import org.jetbrains.jet.test.generator.SimpleTestClassModel;
@@ -403,6 +404,13 @@ public class GenerateTests {
                 AbstractJetSafeDeleteTest.class,
                 testModel("idea/testData/safeDelete/deleteClass", "doClassTest"),
                 testModel("idea/testData/safeDelete/deleteObject", "doObjectTest")
+        );
+
+        generateTest(
+                "idea/tests/",
+                "ReferenceResolveTestGenerated",
+                AbstractResolveBaseTest.class,
+                testModel("idea/testData/resolve/references", "doTest")
         );
     }
 
