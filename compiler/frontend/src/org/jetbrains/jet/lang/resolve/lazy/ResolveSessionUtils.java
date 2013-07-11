@@ -113,7 +113,7 @@ public class ResolveSessionUtils {
         }
     }
 
-    public static @NotNull BindingContext resolveToExpression(
+    public static @NotNull BindingContext resolveToElement(
             @NotNull ResolveSession resolveSession,
             @NotNull JetElement expression
     ) {
