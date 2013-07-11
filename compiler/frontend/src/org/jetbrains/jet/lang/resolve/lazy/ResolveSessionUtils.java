@@ -27,6 +27,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.jet.di.InjectorForBodyResolve;
 import org.jetbrains.jet.lang.descriptors.*;
+import org.jetbrains.jet.lang.descriptors.annotations.Annotated;
 import org.jetbrains.jet.lang.descriptors.impl.ClassDescriptorBase;
 import org.jetbrains.jet.lang.descriptors.impl.MutableClassDescriptor;
 import org.jetbrains.jet.lang.psi.*;
@@ -115,19 +116,21 @@ public class ResolveSessionUtils {
 
     public static @NotNull BindingContext resolveToElement(
             @NotNull ResolveSession resolveSession,
-            @NotNull JetElement expression
+            @NotNull JetElement jetElement
     ) {
         DelegatingBindingTrace trace = new DelegatingBindingTrace(
-                resolveSession.getBindingContext(), "trace to resolve expression", expression);
-        JetFile file = (JetFile) expression.getContainingFile();
+                resolveSession.getBindingContext(), "trace to resolve expression", jetElement);
 
         @SuppressWarnings("unchecked")
-        PsiElement topmostCandidateForAdditionalResolve = JetPsiUtil.getTopmostParentOfTypes(expression,
+        PsiElement topmostCandidateForAdditionalResolve = JetPsiUtil.getTopmostParentOfTypes(jetElement,
                 JetNamedFunction.class, JetClassInitializer.class,
                 JetProperty.class, JetDelegationSpecifierList.class,
-                JetImportDirective.class);
+                JetImportDirective.class, JetAnnotationEntry.class);
 
         if (topmostCandidateForAdditionalResolve != null) {
+            // All additional resolve should be done to separate trace
+            JetFile file = (JetFile) jetElement.getContainingFile();
+
             if (topmostCandidateForAdditionalResolve instanceof JetNamedFunction) {
                 functionAdditionalResolve(resolveSession, (JetNamedFunction) topmostCandidateForAdditionalResolve, trace, file);
             }
@@ -148,6 +151,10 @@ public class ResolveSessionUtils {
                 // Get all descriptors to force resolving all imports
                 scope.getAllDescriptors();
             }
+            else if (topmostCandidateForAdditionalResolve instanceof JetAnnotationEntry) {
+                annotationAdditionalResolve(resolveSession, (JetAnnotationEntry) topmostCandidateForAdditionalResolve);
+                return resolveSession.getBindingContext();
+            }
             else {
                 assert false : "Invalid type of the topmost parent";
             }
@@ -155,8 +162,8 @@ public class ResolveSessionUtils {
             return trace.getBindingContext();
         }
 
-        if (expression instanceof JetExpression) {
-            JetExpression jetExpression = (JetExpression) expression;
+        if (jetElement instanceof JetExpression) {
+            JetExpression jetExpression = (JetExpression) jetElement;
             // Setup resolution scope explicitly
             if (trace.getBindingContext().get(BindingContext.RESOLUTION_SCOPE, jetExpression) == null) {
                 JetScope scope = getExpressionMemberScope(resolveSession, jetExpression);
@@ -167,6 +174,16 @@ public class ResolveSessionUtils {
         }
 
         return trace.getBindingContext();
+    }
+
+    private static void annotationAdditionalResolve(KotlinCodeAnalyzer analyzer, JetAnnotationEntry jetAnnotationEntry) {
+        JetDeclaration declaration = PsiTreeUtil.getParentOfType(jetAnnotationEntry, JetDeclaration.class);
+        if (declaration != null) {
+            Annotated descriptor = analyzer.resolveToDescriptor(declaration);
+
+            // Activate annotation resolving
+            descriptor.getAnnotations();
+        }
     }
 
     private static void delegationSpecifierAdditionalResolve(
