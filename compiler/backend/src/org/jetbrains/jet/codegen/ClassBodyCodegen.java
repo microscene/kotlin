@@ -34,7 +34,7 @@ import java.util.Collections;
 import java.util.List;
 
 import static org.jetbrains.asm4.Opcodes.*;
-import static org.jetbrains.jet.codegen.AsmUtil.*;
+import static org.jetbrains.jet.codegen.AsmUtil.genMethodThrow;
 import static org.jetbrains.jet.codegen.binding.CodegenBinding.enumEntryNeedSubclass;
 
 public abstract class ClassBodyCodegen extends MemberCodegen {
@@ -73,9 +73,14 @@ public abstract class ClassBodyCodegen extends MemberCodegen {
         generateStaticInitializer();
 
         generateRemoveInIterator();
+
+        generateKotlinAnnotation();
     }
 
     protected abstract void generateDeclaration();
+
+    protected void generateKotlinAnnotation() {
+    }
 
     protected void generateSyntheticParts() {
     }
