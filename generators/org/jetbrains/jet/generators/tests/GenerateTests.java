@@ -59,6 +59,10 @@ import java.util.Arrays;
 import java.util.regex.Pattern;
 
 public class GenerateTests {
+    static {
+        System.setProperty("java.awt.headless", "true");
+    }
+
     private static void generateTest(
             @NotNull String baseDir,
             @NotNull String suiteClass,
