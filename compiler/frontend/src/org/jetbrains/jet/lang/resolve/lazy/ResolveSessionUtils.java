@@ -193,6 +193,9 @@ public class ResolveSessionUtils {
         }
 
         JetDeclaration declaration = PsiTreeUtil.getParentOfType(jetElement, JetDeclaration.class, false);
+        if (declaration instanceof JetParameter && ((JetParameter)declaration).getValOrVarNode() == null) {
+            declaration = PsiTreeUtil.getParentOfType(declaration, JetDeclaration.class);
+        }
         if (declaration != null) {
             // Activate descriptor resolution
             resolveSession.resolveToDescriptor(declaration);
