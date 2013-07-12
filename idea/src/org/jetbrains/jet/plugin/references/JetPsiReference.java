@@ -109,7 +109,7 @@ public abstract class JetPsiReference implements PsiPolyVariantReference {
         Profiler subTask = ProfilerUtil.create("Resolve task:" + myExpression.getText());
         try {
             subTask.start();
-            bindingContext = WholeProjectAnalyzerFacade.getContextForExpression(myExpression);
+            bindingContext = WholeProjectAnalyzerFacade.getContextForElement(myExpression);
 
             List<PsiElement> psiElements = BindingContextUtils.resolveToDeclarationPsiElements(bindingContext, myExpression);
             if (psiElements.size() == 1) {
