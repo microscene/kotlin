@@ -135,7 +135,9 @@ public abstract class ClassBodyCodegen extends MemberCodegen {
                     }
                     else {
                         Type type = state.getTypeMapper().mapType(propertyDescriptor);
-                        v.newMethod(p, ACC_PUBLIC | ACC_ABSTRACT, p.getName(), "()" + type.getDescriptor(), null, null);
+                        String name = p.getName();
+                        assert name != null : "Annotation parameter has no name: " + p.getText();
+                        v.newMethod(p, ACC_PUBLIC | ACC_ABSTRACT, name, "()" + type.getDescriptor(), null, null);
                     }
                 }
             }
