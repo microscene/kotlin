@@ -180,6 +180,18 @@ public class ResolveSessionUtils {
 
                 return resolveSession.getBindingContext();
             }
+            //else if (resolveElement instanceof JetNamespaceHeader) {
+            //    if (jetElement instanceof JetExpression) {
+            //        JetExpression jetExpression = (JetExpression) jetElement;
+            //        // Setup resolution scope explicitly
+            //        if (trace.getBindingContext().get(BindingContext.RESOLUTION_SCOPE, jetExpression) == null) {
+            //            JetScope scope = getExpressionMemberScope(resolveSession, jetExpression);
+            //            if (scope != null) {
+            //                trace.record(BindingContext.RESOLUTION_SCOPE, jetExpression, scope);
+            //            }
+            //        }
+            //    }
+            //}
             else {
                 assert false : "Invalid type of the topmost parent";
             }
@@ -187,16 +199,16 @@ public class ResolveSessionUtils {
             return trace.getBindingContext();
         }
 
-        if (jetElement instanceof JetExpression) {
-            JetExpression jetExpression = (JetExpression) jetElement;
-            // Setup resolution scope explicitly
-            if (trace.getBindingContext().get(BindingContext.RESOLUTION_SCOPE, jetExpression) == null) {
-                JetScope scope = getExpressionMemberScope(resolveSession, jetExpression);
-                if (scope != null) {
-                    trace.record(BindingContext.RESOLUTION_SCOPE, jetExpression, scope);
-                }
-            }
-        }
+        //if (jetElement instanceof JetExpression) {
+        //    JetExpression jetExpression = (JetExpression) jetElement;
+        //    // Setup resolution scope explicitly
+        //    if (trace.getBindingContext().get(BindingContext.RESOLUTION_SCOPE, jetExpression) == null) {
+        //        JetScope scope = getExpressionMemberScope(resolveSession, jetExpression);
+        //        if (scope != null) {
+        //            trace.record(BindingContext.RESOLUTION_SCOPE, jetExpression, scope);
+        //        }
+        //    }
+        //}
 
         return trace.getBindingContext();
     }
