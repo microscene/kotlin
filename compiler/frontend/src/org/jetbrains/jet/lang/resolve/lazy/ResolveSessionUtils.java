@@ -193,9 +193,19 @@ public class ResolveSessionUtils {
         }
 
         JetDeclaration declaration = PsiTreeUtil.getParentOfType(jetElement, JetDeclaration.class, false);
-        if (declaration instanceof JetParameter && ((JetParameter)declaration).getValOrVarNode() == null) {
-            declaration = PsiTreeUtil.getParentOfType(declaration, JetDeclaration.class);
+        if (declaration instanceof JetParameter) {
+            if (((JetParameter)declaration).getValOrVarNode() == null) {
+                declaration = PsiTreeUtil.getParentOfType(declaration, JetDeclaration.class);
+                DeclarationDescriptor descriptor = resolveSession.resolveToDescriptor(declaration);
+                if (descriptor instanceof ClassDescriptor) {
+                    ConstructorDescriptor constructor = ((ClassDescriptor) descriptor).getUnsubstitutedPrimaryConstructor();
+                    assert constructor != null;
+                    constructor.getValueParameters();
+                    return resolveSession.getBindingContext();
+                }
+            }
         }
+
         if (declaration != null) {
             // Activate descriptor resolution
             resolveSession.resolveToDescriptor(declaration);
