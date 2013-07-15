@@ -31,6 +31,8 @@ import org.jetbrains.jet.lang.psi.*;
 import org.jetbrains.jet.lang.resolve.BindingContext;
 import org.jetbrains.jet.lang.resolve.BindingTrace;
 import org.jetbrains.jet.lang.resolve.BindingTraceContext;
+import org.jetbrains.jet.lang.resolve.DescriptorUtils;
+import org.jetbrains.jet.lang.resolve.lazy.data.JetClassLikeInfo;
 import org.jetbrains.jet.lang.resolve.lazy.declarations.DeclarationProviderFactory;
 import org.jetbrains.jet.lang.resolve.lazy.declarations.PackageMemberDeclarationProvider;
 import org.jetbrains.jet.lang.resolve.lazy.descriptors.LazyClassDescriptor;
@@ -41,6 +43,7 @@ import org.jetbrains.jet.lang.resolve.name.FqNameUnsafe;
 import org.jetbrains.jet.lang.resolve.name.Name;
 import org.jetbrains.jet.lang.resolve.scopes.JetScope;
 
+import java.util.Collection;
 import java.util.List;
 
 import static org.jetbrains.jet.lang.resolve.lazy.ResolveSessionUtils.safeNameForLazyResolve;
@@ -189,10 +192,37 @@ public class ResolveSession implements KotlinCodeAnalyzer {
     }
 
     /*package*/ LazyClassDescriptor getClassObjectDescriptor(JetClassObject classObject) {
-        LazyClassDescriptor classDescriptor = (LazyClassDescriptor) getClassDescriptor(PsiTreeUtil.getParentOfType(classObject, JetClass.class));
-        LazyClassDescriptor classObjectDescriptor = (LazyClassDescriptor) classDescriptor.getClassObjectDescriptor();
-        assert classObjectDescriptor != null : "Class object is declared, but is null for " + classDescriptor;
-        return classObjectDescriptor;
+        JetClass aClass = PsiTreeUtil.getParentOfType(classObject, JetClass.class);
+
+        LazyClassDescriptor parentClassDescriptor;
+
+        if (aClass != null) {
+            parentClassDescriptor = (LazyClassDescriptor) getClassDescriptor(aClass);
+        }
+        else {
+            // Class object in object is a error but we want to find descriptors even for this case
+            JetObjectDeclaration objectDeclaration = PsiTreeUtil.getParentOfType(classObject, JetObjectDeclaration.class);
+            assert objectDeclaration != null : String.format("Class object %s can be in class or object in file %s", classObject, classObject.getContainingFile().getText());
+            parentClassDescriptor = (LazyClassDescriptor) getClassDescriptor(objectDeclaration);
+        }
+
+        // Activate resolution and writing to trace
+        parentClassDescriptor.getClassObjectDescriptor();
+        DeclarationDescriptor declaration = getBindingContext().get(BindingContext.DECLARATION_TO_DESCRIPTOR, classObject.getObjectDeclaration());
+
+        if (declaration == null) {
+            // It's possible that there are several class objects and another class object is taking part in lazy resolve. We still want to
+            // build descriptors for such class objects.
+            JetClassLikeInfo classObjectInfo = parentClassDescriptor.getClassObjectInfo(classObject);
+            if (classObjectInfo != null) {
+                // Can't use ordinal name due to clashing with primary class object
+                Name name = DescriptorUtils.getClassObjectName(parentClassDescriptor.getName().asString() + classObject.hashCode());
+
+                return new LazyClassDescriptor(this, parentClassDescriptor, name, classObjectInfo);
+            }
+        }
+
+        return (LazyClassDescriptor) declaration;
     }
 
     @Override
@@ -289,7 +319,11 @@ public class ResolveSession implements KotlinCodeAnalyzer {
             @Override
             public DeclarationDescriptor visitProperty(JetProperty property, Void data) {
                 JetScope scopeForDeclaration = getInjector().getScopeProvider().getResolutionScopeForDeclaration(property);
-                scopeForDeclaration.getProperties(safeNameForLazyResolve(property));
+                Collection<VariableDescriptor> properties = scopeForDeclaration.getProperties(safeNameForLazyResolve(property));
+                if (properties.isEmpty()) {
+
+                }
+
                 return getBindingContext().get(BindingContext.DECLARATION_TO_DESCRIPTOR, property);
             }
 
