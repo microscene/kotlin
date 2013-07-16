@@ -3234,6 +3234,11 @@ public class JetDiagnosticsTestGenerated extends AbstractDiagnosticsTestWithEage
                 doTest("compiler/testData/diagnostics/tests/j+k/ambiguousSamAdapters.kt");
             }
             
+            @TestMetadata("cantDeclareIfSamAdapterIsInherited.kt")
+            public void testCantDeclareIfSamAdapterIsInherited() throws Exception {
+                doTest("compiler/testData/diagnostics/tests/j+k/cantDeclareIfSamAdapterIsInherited.kt");
+            }
+            
             @TestMetadata("inheritAbstractSamAdapter.kt")
             public void testInheritAbstractSamAdapter() throws Exception {
                 doTest("compiler/testData/diagnostics/tests/j+k/inheritAbstractSamAdapter.kt");
@@ -3312,6 +3317,11 @@ public class JetDiagnosticsTestGenerated extends AbstractDiagnosticsTestWithEage
             @TestMetadata("packageVisibility.kt")
             public void testPackageVisibility() throws Exception {
                 doTest("compiler/testData/diagnostics/tests/j+k/packageVisibility.kt");
+            }
+            
+            @TestMetadata("recursiveRawUpperBound.kt")
+            public void testRecursiveRawUpperBound() throws Exception {
+                doTest("compiler/testData/diagnostics/tests/j+k/recursiveRawUpperBound.kt");
             }
             
             @TestMetadata("Simple.kt")
