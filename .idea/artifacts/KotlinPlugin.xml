@@ -17,6 +17,9 @@
             <element id="module-output" name="cli-common" />
             <element id="module-output" name="ide-compiler-runner" />
             <element id="module-output" name="preloader" />
+            <element id="module-output" name="serialization" />
+            <element id="library" level="project" name="protobuf-java" />
+            <element id="module-output" name="serialization.java" />
           </element>
           <element id="library" level="project" name="js-libs" />
           <element id="archive" name="kotlin-js-libraries.zip">
