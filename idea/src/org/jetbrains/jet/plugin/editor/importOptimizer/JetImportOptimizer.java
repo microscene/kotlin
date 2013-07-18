@@ -178,8 +178,7 @@ public class JetImportOptimizer implements ImportOptimizer {
 
             @Override
             public void visitForExpression(JetForExpression expression) {
-                ResolveSession resolveSession = WholeProjectAnalyzerFacade.getLazyResolveSessionForFile((JetFile) expression.getContainingFile());
-                BindingContext context = ResolveSessionUtils.resolveToElement(resolveSession, expression);
+                BindingContext context = WholeProjectAnalyzerFacade.getContextForElement(expression);
                 ResolvedCall<FunctionDescriptor> resolvedCall = context.get(BindingContext.LOOP_RANGE_ITERATOR_RESOLVED_CALL, expression.getLoopRange());
                 addResolvedCallFqName(resolvedCall);
 

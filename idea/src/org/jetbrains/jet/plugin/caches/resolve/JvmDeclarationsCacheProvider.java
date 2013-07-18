@@ -57,6 +57,7 @@ class JvmDeclarationsCacheProvider extends DeclarationsCacheProvider {
                 // This lock is already acquired by the calling method,
                 // but we put it here to guard for the case of further modifications
                 synchronized (declarationAnalysisLock) {
+                    System.out.println("!!! Out of block");
                     BindingTraceContext trace = new BindingTraceContext();
 
                     incompleteTrace = trace;

@@ -108,6 +108,11 @@ public class LockBasedStorageManager implements StorageManager {
         return new LockProtectedTrace(lock, originalTrace);
     }
 
+    @Override
+    public <T> T compute(@NotNull Computable<T> computable) {
+        return createNullableLazyValue(computable).compute();
+    }
+
     private static class LockBasedLazyValue<T> implements NullableLazyValue<T> {
         private final Object lock;
         private final Computable<T> computable;

@@ -20,6 +20,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Functions;
 import com.google.common.base.Predicates;
 import com.google.common.collect.Lists;
+import com.intellij.openapi.util.Computable;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.PsiFile;
 import com.intellij.psi.util.PsiTreeUtil;
@@ -117,106 +118,114 @@ public class ResolveSessionUtils {
     }
 
     public static @NotNull BindingContext resolveToElement(
-            @NotNull ResolveSession resolveSession,
-            @NotNull JetElement jetElement
+            @NotNull final ResolveSession resolveSession,
+            @NotNull final JetElement jetElement
     ) {
-        @SuppressWarnings("unchecked")
-        PsiElement resolveElement = JetPsiUtil.getTopmostParentOfTypes(jetElement,
-                JetNamedFunction.class, JetClassInitializer.class,
-                JetProperty.class, JetDelegationSpecifierList.class,
-                JetImportDirective.class, JetAnnotationEntry.class,
-                JetTypeParameter.class, JetTypeConstraint.class,
-                JetNamespaceHeader.class);
+        return resolveSession.getStorageManager().compute(new Computable<BindingContext>() {
+            @Override
+            public BindingContext compute() {
+                // System.out.println("Resolve to element: " + jetElement + " " + jetElement.getText().substring(0, Math.min(35, jetElement.getTextLength())));
 
-        if (resolveElement != null) {
-            // All additional resolve should be done to separate trace
-            DelegatingBindingTrace trace = new DelegatingBindingTrace(resolveSession.getBindingContext(), "trace to resolve element", jetElement);
+                @SuppressWarnings("unchecked")
+                PsiElement resolveElement = JetPsiUtil.getTopmostParentOfTypes(jetElement,
+                                                                               JetNamedFunction.class, JetClassInitializer.class,
+                                                                               JetProperty.class, JetDelegationSpecifierList.class,
+                                                                               JetImportDirective.class, JetAnnotationEntry.class,
+                                                                               JetTypeParameter.class, JetTypeConstraint.class,
+                                                                               JetNamespaceHeader.class);
 
-            JetFile file = (JetFile) jetElement.getContainingFile();
+                if (resolveElement != null) {
+                    // All additional resolve should be done to separate trace
+                    BindingTrace trace = resolveSession.getStorageManager().createSafeTrace(
+                            new DelegatingBindingTrace(resolveSession.getBindingContext(), "trace to resolve element", jetElement));
 
-            if (resolveElement instanceof JetNamedFunction) {
-                functionAdditionalResolve(resolveSession, (JetNamedFunction) resolveElement, trace, file);
-            }
-            else if (resolveElement instanceof JetClassInitializer) {
-                initializerAdditionalResolve(resolveSession, (JetClassInitializer) resolveElement, trace, file);
-            }
-            else if (resolveElement instanceof JetProperty) {
-                propertyAdditionalResolve(resolveSession, (JetProperty) resolveElement, trace, file);
-            }
-            else if (resolveElement instanceof JetDelegationSpecifierList) {
-                delegationSpecifierAdditionalResolve(resolveSession, (JetDelegationSpecifierList) resolveElement,
-                                                     trace, file);
-            }
-            else if (resolveElement instanceof JetImportDirective) {
-                JetImportDirective importDirective = (JetImportDirective) resolveElement;
-                JetScope scope = resolveSession.getInjector().getScopeProvider().getFileScope((JetFile) importDirective.getContainingFile());
+                    JetFile file = (JetFile) jetElement.getContainingFile();
 
-                // Get all descriptors to force resolving all imports
-                scope.getAllDescriptors();
-            }
-            else if (resolveElement instanceof JetAnnotationEntry) {
-                annotationAdditionalResolve(resolveSession, (JetAnnotationEntry) resolveElement);
-                return resolveSession.getBindingContext();
-            }
-            else if (resolveElement instanceof JetTypeParameter) {
-                DeclarationDescriptor descriptor = resolveSession.resolveToDescriptor((JetTypeParameter) resolveElement);
-                if (descriptor instanceof TypeParameterDescriptor) {
-                    TypeParameterDescriptor parameterDescriptor = (TypeParameterDescriptor) descriptor;
+                    if (resolveElement instanceof JetNamedFunction) {
+                        functionAdditionalResolve(resolveSession, (JetNamedFunction) resolveElement, trace, file);
+                    }
+                    else if (resolveElement instanceof JetClassInitializer) {
+                        initializerAdditionalResolve(resolveSession, (JetClassInitializer) resolveElement, trace, file);
+                    }
+                    else if (resolveElement instanceof JetProperty) {
+                        propertyAdditionalResolve(resolveSession, (JetProperty) resolveElement, trace, file);
+                    }
+                    else if (resolveElement instanceof JetDelegationSpecifierList) {
+                        delegationSpecifierAdditionalResolve(resolveSession, (JetDelegationSpecifierList) resolveElement,
+                                                             trace, file);
+                    }
+                    else if (resolveElement instanceof JetImportDirective) {
+                        JetImportDirective importDirective = (JetImportDirective) resolveElement;
+                        JetScope scope = resolveSession.getInjector().getScopeProvider().getFileScope((JetFile) importDirective.getContainingFile());
 
-                    parameterDescriptor.getLowerBounds();
-                    parameterDescriptor.getUpperBounds();
+                        // Get all descriptors to force resolving all imports
+                        scope.getAllDescriptors();
+                    }
+                    else if (resolveElement instanceof JetAnnotationEntry) {
+                        annotationAdditionalResolve(resolveSession, (JetAnnotationEntry) resolveElement);
+                        return resolveSession.getBindingContext();
+                    }
+                    else if (resolveElement instanceof JetTypeParameter) {
+                        DeclarationDescriptor descriptor = resolveSession.resolveToDescriptor((JetTypeParameter) resolveElement);
+                        if (descriptor instanceof TypeParameterDescriptor) {
+                            TypeParameterDescriptor parameterDescriptor = (TypeParameterDescriptor) descriptor;
 
-                    return resolveSession.getBindingContext();
+                            parameterDescriptor.getLowerBounds();
+                            parameterDescriptor.getUpperBounds();
+
+                            return resolveSession.getBindingContext();
+                        }
+                    }
+                    else if (resolveElement instanceof JetTypeConstraint) {
+                        JetDeclaration declaration = PsiTreeUtil.getParentOfType(jetElement, JetDeclaration.class);
+                        DeclarationDescriptor descriptor = resolveSession.resolveToDescriptor(declaration);
+                        if (descriptor instanceof ClassDescriptor) {
+                            TypeConstructor constructor = ((ClassDescriptor) descriptor).getTypeConstructor();
+                            for (TypeParameterDescriptor parameterDescriptor : constructor.getParameters()) {
+                                parameterDescriptor.getLowerBounds();
+                                parameterDescriptor.getUpperBounds();
+                            }
+                        }
+
+                        return resolveSession.getBindingContext();
+                    }
+                    else if (resolveElement instanceof JetNamespaceHeader) {
+                        namespaceRefAdditionalResolve(resolveSession, (JetNamespaceHeader) resolveElement, trace, jetElement);
+                    }
+                    else {
+                        assert false : "Invalid type of the topmost parent";
+                    }
+
+                    return trace.getBindingContext();
                 }
-            }
-            else if (resolveElement instanceof JetTypeConstraint) {
-                JetDeclaration declaration = PsiTreeUtil.getParentOfType(jetElement, JetDeclaration.class);
-                DeclarationDescriptor descriptor = resolveSession.resolveToDescriptor(declaration);
-                if (descriptor instanceof ClassDescriptor) {
-                    TypeConstructor constructor = ((ClassDescriptor) descriptor).getTypeConstructor();
-                    for (TypeParameterDescriptor parameterDescriptor : constructor.getParameters()) {
-                        parameterDescriptor.getLowerBounds();
-                        parameterDescriptor.getUpperBounds();
+
+                JetDeclaration declaration = PsiTreeUtil.getParentOfType(jetElement, JetDeclaration.class, false);
+                if (declaration instanceof JetParameter) {
+                    if (((JetParameter)declaration).getValOrVarNode() == null) {
+                        declaration = PsiTreeUtil.getParentOfType(declaration, JetDeclaration.class);
+                        DeclarationDescriptor descriptor = resolveSession.resolveToDescriptor(declaration);
+                        if (descriptor instanceof ClassDescriptor) {
+                            ConstructorDescriptor constructor = ((ClassDescriptor) descriptor).getUnsubstitutedPrimaryConstructor();
+                            assert constructor != null;
+                            constructor.getValueParameters();
+                            return resolveSession.getBindingContext();
+                        }
                     }
                 }
 
+                if (declaration != null) {
+                    // Activate descriptor resolution
+                    resolveSession.resolveToDescriptor(declaration);
+                }
+
                 return resolveSession.getBindingContext();
             }
-            else if (resolveElement instanceof JetNamespaceHeader) {
-                namespaceRefAdditionalResolve(resolveSession, (JetNamespaceHeader) resolveElement, trace, jetElement);
-            }
-            else {
-                assert false : "Invalid type of the topmost parent";
-            }
-
-            return trace.getBindingContext();
-        }
-
-        JetDeclaration declaration = PsiTreeUtil.getParentOfType(jetElement, JetDeclaration.class, false);
-        if (declaration instanceof JetParameter) {
-            if (((JetParameter)declaration).getValOrVarNode() == null) {
-                declaration = PsiTreeUtil.getParentOfType(declaration, JetDeclaration.class);
-                DeclarationDescriptor descriptor = resolveSession.resolveToDescriptor(declaration);
-                if (descriptor instanceof ClassDescriptor) {
-                    ConstructorDescriptor constructor = ((ClassDescriptor) descriptor).getUnsubstitutedPrimaryConstructor();
-                    assert constructor != null;
-                    constructor.getValueParameters();
-                    return resolveSession.getBindingContext();
-                }
-            }
-        }
-
-        if (declaration != null) {
-            // Activate descriptor resolution
-            resolveSession.resolveToDescriptor(declaration);
-        }
-
-        return resolveSession.getBindingContext();
+        });
     }
 
     private static void namespaceRefAdditionalResolve(
             ResolveSession resolveSession,
-            JetNamespaceHeader header, DelegatingBindingTrace trace, JetElement jetElement
+            JetNamespaceHeader header, BindingTrace trace, JetElement jetElement
     ) {
         if (jetElement instanceof JetSimpleNameExpression) {
             JetSimpleNameExpression packageNameExpression = (JetSimpleNameExpression) jetElement;
@@ -251,7 +260,7 @@ public class ResolveSessionUtils {
 
     private static void delegationSpecifierAdditionalResolve(
             KotlinCodeAnalyzer analyzer,
-            JetDelegationSpecifierList specifier, DelegatingBindingTrace trace, JetFile file) {
+            JetDelegationSpecifierList specifier, BindingTrace trace, JetFile file) {
         BodyResolver bodyResolver = createBodyResolverWithEmptyContext(trace, file, analyzer.getRootModuleDescriptor());
 
         JetClassOrObject classOrObject = (JetClassOrObject) specifier.getParent();
@@ -266,7 +275,7 @@ public class ResolveSessionUtils {
                                                     descriptor.getScopeForMemberDeclarationResolution());
     }
 
-    private static void propertyAdditionalResolve(ResolveSession resolveSession, final JetProperty jetProperty, DelegatingBindingTrace trace, JetFile file) {
+    private static void propertyAdditionalResolve(ResolveSession resolveSession, final JetProperty jetProperty, BindingTrace trace, JetFile file) {
         final JetScope propertyResolutionScope = resolveSession.getInjector().getScopeProvider().getResolutionScopeForDeclaration(
                 jetProperty);
 
@@ -296,7 +305,7 @@ public class ResolveSessionUtils {
     private static void functionAdditionalResolve(
             ResolveSession resolveSession,
             JetNamedFunction namedFunction,
-            DelegatingBindingTrace trace,
+            BindingTrace trace,
             JetFile file
     ) {
         BodyResolver bodyResolver = createBodyResolverWithEmptyContext(trace, file, resolveSession.getRootModuleDescriptor());
@@ -308,7 +317,7 @@ public class ResolveSessionUtils {
     private static boolean initializerAdditionalResolve(
             KotlinCodeAnalyzer analyzer,
             JetClassInitializer classInitializer,
-            DelegatingBindingTrace trace,
+            BindingTrace trace,
             JetFile file
     ) {
         BodyResolver bodyResolver = createBodyResolverWithEmptyContext(trace, file, analyzer.getRootModuleDescriptor());
@@ -320,7 +329,7 @@ public class ResolveSessionUtils {
         return true;
     }
 
-    private static BodyResolver createBodyResolver(DelegatingBindingTrace trace, JetFile file, BodyResolveContextForLazy bodyResolveContext,
+    private static BodyResolver createBodyResolver(BindingTrace trace, JetFile file, BodyResolveContextForLazy bodyResolveContext,
             ModuleDescriptor module) {
         TopDownAnalysisParameters parameters = new TopDownAnalysisParameters(
                 Predicates.<PsiFile>alwaysTrue(), false, true, Collections.<AnalyzerScriptParameter>emptyList());
@@ -329,7 +338,7 @@ public class ResolveSessionUtils {
     }
 
     private static BodyResolver createBodyResolverWithEmptyContext(
-            DelegatingBindingTrace trace,
+            BindingTrace trace,
             JetFile file,
             ModuleDescriptor module
     ) {

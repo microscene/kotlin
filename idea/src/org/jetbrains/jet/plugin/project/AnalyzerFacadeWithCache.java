@@ -49,7 +49,6 @@ import org.jetbrains.jet.plugin.caches.resolve.KotlinCacheManagerUtil;
 import org.jetbrains.jet.plugin.caches.resolve.KotlinDeclarationsCache;
 import org.jetbrains.jet.plugin.caches.resolve.KotlinDeclarationsCacheImpl;
 import org.jetbrains.jet.plugin.util.ApplicationUtils;
-import org.jetbrains.jet.utils.Profiler;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -59,9 +58,10 @@ public final class AnalyzerFacadeWithCache {
     private static final Logger LOG = Logger.getInstance("org.jetbrains.jet.plugin.project.AnalyzerFacadeWithCache");
 
     private final static Key<CachedValue<SLRUCache<JetFile, AnalyzeExhaust>>> ANALYZE_EXHAUST_FULL = Key.create("ANALYZE_EXHAUST_FULL");
-    private final static Key<CachedValue<SLRUCache<JetFile, ResolveSession>>> RESOLVE_SESSION_KEY = Key.create("ANALYZE_EXHAUST_FULL");
+    private final static Key<CachedValue<SLRUCache<JetFile, ResolveSession>>> RESOLVE_SESSION_KEY = Key.create("RESOLVE_SESSION_KEY");
 
     private static final Object lock = new Object();
+    private static final Object sessionLock = new Object();
 
     private AnalyzerFacadeWithCache() {
     }
@@ -172,25 +172,22 @@ public final class AnalyzerFacadeWithCache {
     @NotNull
     public static ResolveSession getLazyResolveSession(@NotNull JetFile file) {
         final Project fileProject = file.getProject();
-        return CachedValuesManager.getManager(fileProject).getCachedValue(
-                fileProject,
-                RESOLVE_SESSION_KEY,
-                new CachedValueProvider<SLRUCache<JetFile, ResolveSession>>() {
-                    @Nullable
-                    @Override
-                    public Result<SLRUCache<JetFile, ResolveSession>> compute() {
-                        SLRUCache<JetFile, ResolveSession> cache = new SLRUCache<JetFile, ResolveSession>(3, 8) {
-                            @NotNull
-                            @Override
-                            public ResolveSession createValue(JetFile file) {
-                                Profiler profiler = Profiler.create("Recreate: " + Thread.currentThread().getName() + " " +
-                                                                    PsiManager.getInstance(fileProject).getModificationTracker()
-                                                                            .getModificationCount());
-                                try {
-                                    profiler.printEntering();
-                                    profiler.start();
+
+        synchronized (sessionLock) {
+            return CachedValuesManager.getManager(fileProject).getCachedValue(
+                    fileProject,
+                    RESOLVE_SESSION_KEY,
+                    new CachedValueProvider<SLRUCache<JetFile, ResolveSession>>() {
+                        @Nullable
+                        @Override
+                        public Result<SLRUCache<JetFile, ResolveSession>> compute() {
+                            SLRUCache<JetFile, ResolveSession> cache = new SLRUCache<JetFile, ResolveSession>(1, 3) {
+                                @NotNull
+                                @Override
+                                public ResolveSession createValue(JetFile file) {
+                                    Project project = file.getProject();
                                     Collection<JetFile> files =
-                                            JetFilesProvider.getInstance(fileProject).allInScope(GlobalSearchScope.allScope(fileProject));
+                                            JetFilesProvider.getInstance(project).allInScope(GlobalSearchScope.allScope(project));
 
                                     // Given file can differ from the original because it can be a virtual copy with some modifications
                                     JetFile originalFile = (JetFile) file.getOriginalFile();
@@ -199,16 +196,13 @@ public final class AnalyzerFacadeWithCache {
 
                                     return AnalyzerFacadeProvider.getAnalyzerFacadeForFile(file).getLazyResolveSession(fileProject, files);
                                 }
-                                finally {
-                                    profiler.end();
-                                }
-                            }
-                        };
+                            };
 
-                        return Result.create(cache, PsiModificationTracker.MODIFICATION_COUNT);
-                    }
-                },
-                false
-        ).get(file);
+                            return Result.create(cache, PsiModificationTracker.MODIFICATION_COUNT);
+                        }
+                    },
+                    false
+            ).get(file);
+        }
     }
 }
